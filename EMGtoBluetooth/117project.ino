@@ -1,3 +1,4 @@
+
 #include <SPI.h>
 #include "Adafruit_BLE_UART.h"
 
@@ -11,6 +12,9 @@ Adafruit_BLE_UART BTLEserial = Adafruit_BLE_UART(ADAFRUITBLE_REQ, ADAFRUITBLE_RD
 
 const int analogInPin = 9;  // Analog input pin that the potentiometer is attached to
 int sensorValue = 0;        // value read from the pot
+
+uint8_t sendBuffer[50];
+int count = 0;
 
 void setup() {
   // initialize serial communications at 9600 bps:
@@ -26,13 +30,15 @@ void setup() {
 
 aci_evt_opcode_t laststatus = ACI_EVT_DISCONNECTED;
 
+uint8_t s;
+
 void loop() {
   // read the analog in value:
   sensorValue = analogRead(analogInPin);
 
   // print the results to the Serial Monitor:
-  Serial.print("sensor = ");
-  Serial.println(sensorValue);
+  //Serial.print("sensor = ");
+  //Serial.println(sensorValue);
 
   // Tell the nRF8001 to do whatever it should be working on.
   BTLEserial.pollACI();
@@ -55,38 +61,43 @@ void loop() {
     laststatus = status;
   }
 
-  if (status == ACI_EVT_CONNECTED) {
-    // Lets see if there's any data for us!
-    if (BTLEserial.available()) {
-      Serial.print("* "); Serial.print(BTLEserial.available()); Serial.println(F(" bytes available from BTLE"));
+  s = sensorValue;
+
+  sendBuffer[count] = s;
+
+  count++;
+
+  Serial.print("Loop: "); Serial.println(count);
+
+  //if buffer reaches 50 values and device connected, send data and reset buffer
+  if (count == 50 && status == ACI_EVT_CONNECTED) {
+    Serial.setTimeout(100); // 100 millisecond timeout
+
+    // write the data
+    BTLEserial.write(sendBuffer, 50);
+
+    for (int i = 0; i < count; i++) {
+      Serial.println(sendBuffer[i]);
     }
-    // OK while we still have something to read, get a character and print it out
-    while (BTLEserial.available()) {
-      char c = BTLEserial.read();
-      Serial.print(c);
+
+    count = 0;
+    for (int i = 0; i < count; i++) {
+      sendBuffer[i] = 0;
     }
 
-    // Next up, see if we have any data to get from the Serial console
-
-    if (Serial.available()) {
-      // Read a line from Serial
-      Serial.setTimeout(100); // 100 millisecond timeout
-      String s = Serial.readString();
-
-      // We need to convert the line to bytes, no more than 20 at this time
-      uint8_t sendbuffer[20];
-      s.getBytes(sendbuffer, 20);
-      char sendbuffersize = min(20, s.length());
-
-      Serial.print(F("\n* Sending -> \"")); Serial.print((char *)sendbuffer); Serial.println("\"");
-
-      // write the data
-      BTLEserial.write(sendbuffer, sendbuffersize);
-    }
   }
 
 
+  //reset buffer if reaches max value of 50 and device still isn't connected
+  if (count == 50 && status != ACI_EVT_CONNECTED) {
+    count = 0;
+
+    for (int i = 0; i < count; i++) {
+      sendBuffer[i] = 0;
+    }
+  }
+
   // wait 2 milliseconds before the next loop for the analog-to-digital
   // converter to settle after the last reading:
-  delay(2);
+  delay(200);
 }
