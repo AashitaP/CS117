@@ -1,3 +1,3 @@
 EMGtoBluetooth: Our code for arduino
 
-The other file: Adafruit code for the app used to receive data
+Bluefruit_LE_Connect_Android_V2: Adafruit code for the app used to receive data
